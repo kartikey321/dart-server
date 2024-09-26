@@ -1,97 +1,120 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+
+// ... (keep the Request class and other parts unchanged)
 
 class Response {
   int statusCode;
   dynamic body;
   Map<String, String> headers = {};
-  bool _isBinary = false;
+  bool isBinary = false;
+  bool isSent = false;
 
-  Response.raw({this.statusCode = 200, this.body = '', Map<String, String>? headers}) {
+  Response({this.statusCode = 200, this.body, Map<String, String>? headers}) {
     if (headers != null) {
       this.headers.addAll(headers);
     }
   }
 
-  Response.json(Map<String, dynamic> jsonData, {this.statusCode = 200})
-      : body = jsonEncode(jsonData) {
+  void json(Map<String, dynamic> data) {
+    body = jsonEncode(data);
     headers['Content-Type'] = ContentType.json.toString();
   }
 
-  Response.plainText(String text, {this.statusCode = 200})
-      : body = text {
+  void text(String data) {
+    body = data;
     headers['Content-Type'] = ContentType.text.toString();
   }
 
-  Response.html(String html, {this.statusCode = 200})
-      : body = html {
+  void html(String html) {
+    body = html;
     headers['Content-Type'] = ContentType.html.toString();
   }
 
-  Response.xml(String xml, {this.statusCode = 200})
-      : body = xml {
+  void xml(String xml) {
+    body = xml;
     headers['Content-Type'] = 'application/xml';
   }
 
-  Response.bytes(Uint8List bytes, {this.statusCode = 200, String contentType = 'application/octet-stream'})
-      : body = bytes,
-        _isBinary = true {
+  void bytes(Uint8List bytes,
+      {String contentType = 'application/octet-stream'}) {
+    body = bytes;
+    isBinary = true;
     headers['Content-Type'] = contentType;
     headers['Content-Length'] = bytes.length.toString();
   }
 
-  static Future<Response> file(File file, {int statusCode = 200}) async {
+  Future<void> file(File file) async {
     if (await file.exists()) {
       final bytes = await file.readAsBytes();
-      return Response.bytes(
-        bytes,
-        statusCode: statusCode,
-        contentType: _getContentType(file.path),
-      );
+      this.bytes(bytes, contentType: _getContentType(file.path));
     } else {
-      return Response.raw(statusCode: HttpStatus.notFound, body: 'File not found');
+      statusCode = HttpStatus.notFound;
+      text('File not found');
     }
+  }
+
+  void redirect(String url, {int status = HttpStatus.movedPermanently}) {
+    statusCode = status;
+    headers['Location'] = url;
   }
 
   static String _getContentType(String filePath) {
     final extension = filePath.split('.').last.toLowerCase();
     switch (extension) {
-      case 'html': return ContentType.html.toString();
-      case 'css': return 'text/css';
-      case 'js': return 'application/javascript';
-      case 'json': return ContentType.json.toString();
-      case 'png': return 'image/png';
+      case 'html':
+        return ContentType.html.toString();
+      case 'css':
+        return 'text/css';
+      case 'js':
+        return 'application/javascript';
+      case 'json':
+        return ContentType.json.toString();
+      case 'png':
+        return 'image/png';
       case 'jpg':
-      case 'jpeg': return 'image/jpeg';
-      case 'gif': return 'image/gif';
-      case 'svg': return 'image/svg+xml';
-      case 'xml': return 'application/xml';
-      case 'pdf': return 'application/pdf';
-  
-      default: return ContentType.binary.toString();
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'gif':
+        return 'image/gif';
+      case 'svg':
+        return 'image/svg+xml';
+      case 'xml':
+        return 'application/xml';
+      case 'pdf':
+        return 'application/pdf';
+
+      default:
+        return ContentType.binary.toString();
     }
   }
 
-void write(HttpResponse httpResponse) {
-  httpResponse.statusCode = statusCode;
+  void send(HttpResponse httpResponse) {
+    if (isSent) return;
+    isSent = true;
 
-  // Set headers
-  headers.forEach((name, value) {
-    httpResponse.headers.set(name, value);
-  });
+    httpResponse.statusCode = statusCode;
 
-  // Write the body
-  if (_isBinary) {
-    // Add binary data
-    httpResponse.add(body as Uint8List);
-  } else {
-    // Write text data
-    httpResponse.write(body);
+    headers.forEach((name, value) {
+      httpResponse.headers.set(name, value);
+    });
+
+    if (isBinary) {
+      httpResponse.add(body as Uint8List);
+    } else if (body != null) {
+      httpResponse.write(body);
+    }
+
+    httpResponse.close();
   }
 
-  // Close the response
-  httpResponse.close();
-}
+  void setHeader(String name, String value) {
+    headers[name] = value;
+  }
 
+  void setStatus(int code) {
+    statusCode = code;
+  }
 }
