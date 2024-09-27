@@ -4,24 +4,39 @@ import '../models/request.dart';
 import '../models/response.dart';
 
 typedef NextFunction = FutureOr<void> Function();
-typedef Middleware = FutureOr<void> Function(
+typedef MiddlewareFunction = Future<void> Function(
     Request request, Response response, NextFunction next);
 typedef RequestHandler = FutureOr<void> Function(
     Request request, Response response);
 
-// lib/di_container.dart
+class Middleware {
+  final String path;
+  final MiddlewareFunction handler;
+
+  Middleware(this.path, this.handler);
+}
+
 class DIContainer {
   final Map<Type, dynamic> _instances = {};
+  final Map<Type, Function> _factories = {};
 
-  void register<T>(T instance) {
+  void registerSingleton<T>(T instance) {
     _instances[T] = instance;
   }
 
+  void registerFactory<T>(T Function() factory) {
+    _factories[T] = factory;
+  }
+
   T get<T>() {
-    final instance = _instances[T];
-    if (instance == null) {
-      throw Exception('No instance registered for type $T');
+    if (_instances.containsKey(T)) {
+      return _instances[T] as T;
     }
-    return instance as T;
+    if (_factories.containsKey(T)) {
+      final instance = _factories[T]!() as T;
+      _instances[T] = instance; // Cache the instance
+      return instance;
+    }
+    throw Exception('No instance or factory registered for type $T');
   }
 }

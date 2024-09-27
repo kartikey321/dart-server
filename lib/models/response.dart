@@ -10,7 +10,9 @@ class Response {
   dynamic body;
   Map<String, String> headers = {};
   bool isBinary = false;
-  bool isSent = false;
+  bool _isSent = false;
+
+  bool get isSent => _isSent;
 
   Response({this.statusCode = 200, this.body, Map<String, String>? headers}) {
     if (headers != null) {
@@ -93,7 +95,7 @@ class Response {
 
   void send(HttpResponse httpResponse) {
     if (isSent) return;
-    isSent = true;
+    _isSent = true;
 
     httpResponse.statusCode = statusCode;
 

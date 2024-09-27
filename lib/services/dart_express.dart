@@ -4,38 +4,70 @@ import 'package:server/services/router.dart';
 
 import '../models/request.dart';
 import '../models/response.dart';
+import 'controller.dart';
 import 'middleware..dart';
+
+class RequestTypes {
+  static const String GET = 'GET';
+  static const String POST = 'POST';
+  static const String PUT = 'PUT';
+  static const String PATCH = 'PATCH';
+  static const String DELETE = 'DELETE';
+  static const String OPTIONS = 'OPTIONS';
+
+  static const List<String> allTypes = [GET, POST, PUT, PATCH, DELETE, OPTIONS];
+}
 
 class DartExpress {
   final Router _router = Router();
   final List<Middleware> _middleware = [];
   final DIContainer _container = DIContainer();
+  void useController(Controller controller) {
+    controller.registerRoutes(this);
+  }
 
-  void use(Middleware middleware) {
-    _middleware.add(middleware);
+  void use(String path, MiddlewareFunction middleware) {
+    _middleware.add(Middleware(path, middleware));
   }
 
   void get(String path, RequestHandler handler) {
-    _router.addRoute('GET', path, handler);
+    _router.addRoute(RequestTypes.GET, path, handler);
   }
 
   void post(String path, RequestHandler handler) {
-    _router.addRoute('POST', path, handler);
+    _router.addRoute(RequestTypes.POST, path, handler);
+  }
+
+  void put(String path, RequestHandler handler) {
+    _router.addRoute(RequestTypes.PUT, path, handler);
+  }
+
+  void patch(String path, RequestHandler handler) {
+    _router.addRoute(RequestTypes.PATCH, path, handler);
+  }
+
+  void delete(String path, RequestHandler handler) {
+    _router.addRoute(RequestTypes.DELETE, path, handler);
+  }
+
+  void options(String path, RequestHandler handler) {
+    _router.addRoute(RequestTypes.OPTIONS, path, handler);
   }
 
   // Add other HTTP methods as needed
 
   void inject<T>(T instance) {
-    _container.register<T>(instance);
+    _container.registerSingleton<T>(instance);
   }
 
-  Future<void> _applyMiddleware(Request request, Response response,
-      List<Middleware> middlewares, int index) async {
-    if (index >= middlewares.length && response.isSent) return;
-
-    await middlewares[index](request, response, () async {
-      await _applyMiddleware(request, response, middlewares, index + 1);
-    });
+  Future<void> _applyMiddleware(Request request, Response response) async {
+    for (var middleware in _middleware) {
+      if (request.uri.path.startsWith(middleware.path)) {
+        bool next = false;
+        await middleware.handler(request, response, () => next = true);
+        if (!next) break;
+      }
+    }
   }
 
   Future<void> listen(int port) async {
@@ -47,15 +79,9 @@ class DartExpress {
     }
   }
 
-  Middleware cors({
+  MiddlewareFunction cors({
     List<String> allowedOrigins = const ['*'],
-    List<String> allowedMethods = const [
-      'GET',
-      'POST',
-      'PUT',
-      'DELETE',
-      'OPTIONS'
-    ],
+    List<String> allowedMethods = RequestTypes.allTypes,
     List<String> allowedHeaders = const ['Content-Type', 'Authorization'],
     bool allowCredentials = false,
     int maxAge = 86400,
@@ -90,10 +116,8 @@ class DartExpress {
     final response = Response();
 
     try {
-      // Apply middleware
-      await _applyMiddleware(request, response, _middleware, 0);
+      await _applyMiddleware(request, response);
 
-      // If response hasn't been sent by middleware, try to route the request
       if (!response.isSent) {
         final handler = _router.findHandler(request.method, request.uri.path);
         if (handler != null) {
@@ -103,19 +127,14 @@ class DartExpress {
           response.text('Not Found');
         }
       }
-    } catch (e) {
-      print('Error handling request: $e');
+    } catch (e, trace) {
+      print('Error handling request: $e, trace:$trace');
       response.setStatus(HttpStatus.internalServerError);
       response.text('Internal Server Error');
     }
 
-    // Send the response if it hasn't been sent yet
     if (!response.isSent) {
       response.send(httpRequest.response);
     }
-  }
-
-  Future<void> _sendResponse(HttpRequest httpRequest, Response response) async {
-    response.send(httpRequest.response);
   }
 }

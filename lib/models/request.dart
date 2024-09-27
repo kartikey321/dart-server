@@ -4,29 +4,22 @@ import 'dart:math';
 
 import 'package:http/http.dart';
 import 'package:mime/mime.dart';
-import 'package:server/extensions.dart';
 
 import '../services/middleware..dart';
 
-class Session {
-  final String id;
-  final Map<String, dynamic> data = {};
-
-  Session(this.id);
-}
-
 class Request {
   final HttpRequest httpRequest;
-  Map<String, dynamic> params = {};
-  final Map<String, String> query;
+  Map<String, String> params = {};
+  late final Map<String, String> query;
   final Session session;
   final DIContainer container;
   Map<String, dynamic>? _body;
   Map<String, dynamic>? _formData;
   Map<String, List<MultipartFile>>? _files;
 
-  Request(
-      this.httpRequest, this.query, this.params, this.session, this.container);
+  Request(this.httpRequest, this.session, this.container) {
+    query = httpRequest.uri.queryParameters;
+  }
 
   String get method => httpRequest.method;
   Uri get uri => httpRequest.uri;
@@ -79,49 +72,19 @@ class Request {
     return _formData ?? {};
   }
 
-  static Request from(
+  factory Request.from(
     HttpRequest httpRequest, {
-    String routePattern = '',
     required DIContainer container,
   }) {
-    // Extract query parameters from the URL
-    final query = httpRequest.uri.queryParameters;
-
-    // Extract route parameters based on the provided route pattern (e.g., `/user/:id`)
-    final params = _extractParams(httpRequest.uri.path, routePattern);
-
-    // Retrieve or generate a session ID
     final sessionId = httpRequest.cookies
-            .containsWithCondition(
-              (cookie) => cookie.name == 'sessionId',
-            )
-            ?.value ??
-        _generateSessionId();
+        .firstWhere(
+          (cookie) => cookie.name == 'sessionId',
+          orElse: () => Cookie('sessionId', _generateSessionId()),
+        )
+        .value;
     final session = Session(sessionId);
 
-    return Request(httpRequest, params, query, session, container);
-  }
-
-  static Map<String, String> _extractParams(String path, String routePattern) {
-    final patternParts =
-        routePattern.split('/').where((part) => part.isNotEmpty).toList();
-    final pathParts = path.split('/').where((part) => part.isNotEmpty).toList();
-
-    if (patternParts.length != pathParts.length) {
-      return {};
-    }
-
-    final params = <String, String>{};
-    for (var i = 0; i < patternParts.length; i++) {
-      if (patternParts[i].startsWith(':')) {
-        final paramName = patternParts[i].substring(1);
-        params[paramName] = pathParts[i];
-      } else if (patternParts[i] != pathParts[i]) {
-        return {};
-      }
-    }
-
-    return params;
+    return Request(httpRequest, session, container);
   }
 
   static String _generateSessionId() {
@@ -133,4 +96,11 @@ class Request {
     await formData; // Ensure formData has been processed
     return _files ?? {};
   }
+}
+
+class Session {
+  final String id;
+  final Map<String, dynamic> data = {};
+
+  Session(this.id);
 }

@@ -7,16 +7,24 @@ void main() {
   app.inject(DatabaseService());
 
   // Use CORS middleware
-  app.use(app.cors(
-      allowedOrigins: ['https://example.com'],
-      allowedMethods: ['GET', 'POST', 'PUT', 'DELETE'],
-      allowCredentials: true));
-  // Add a route
-  app.post('/api/data', (request, response) async {
+  app.use(
+      '/',
+      app.cors(
+          allowedOrigins: ['https://example.com'],
+          allowedMethods: ['GET', 'POST', 'PUT', 'DELETE'],
+          allowCredentials: true));
+
+  // Add a route with path parameter
+  app.get('/api/data', (request, response) async {
     final data = await request.body;
 
     // Process the data
-    response.json({'success': true, 'data': data});
+    response.json({
+      'success': true,
+      'data': data,
+      'params': request.params,
+      'query': request.query
+    });
   });
 
   // Handle form data
