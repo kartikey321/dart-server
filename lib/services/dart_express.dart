@@ -20,54 +20,77 @@ class RequestTypes {
 
 class DartExpress {
   final Router _router = Router();
-  final List<Middleware> _middleware = [];
+  final List<MiddlewareHandler> _globalMiddleware = [];
   final DIContainer _container = DIContainer();
-  void useController(Controller controller) {
-    controller.registerRoutes(this);
+
+  void useController(String prefix, Controller controller) {
+    controller.initialize(this, prefix: prefix);
   }
 
-  void use(String path, MiddlewareFunction middleware) {
-    _middleware.add(Middleware(path, middleware));
+  void use(MiddlewareHandler middleware) {
+    _globalMiddleware.add(middleware);
   }
 
-  void get(String path, RequestHandler handler) {
-    _router.addRoute(RequestTypes.GET, path, handler);
+  void get(String path, RequestHandler handler,
+      {List<MiddlewareHandler>? middleware}) {
+    _addRoute(RequestTypes.GET, path, handler, middleware: middleware);
   }
 
-  void post(String path, RequestHandler handler) {
-    _router.addRoute(RequestTypes.POST, path, handler);
+  void post(String path, RequestHandler handler,
+      {List<MiddlewareHandler>? middleware}) {
+    _addRoute(RequestTypes.POST, path, handler, middleware: middleware);
   }
 
-  void put(String path, RequestHandler handler) {
-    _router.addRoute(RequestTypes.PUT, path, handler);
+  void put(String path, RequestHandler handler,
+      {List<MiddlewareHandler>? middleware}) {
+    _addRoute(RequestTypes.PUT, path, handler, middleware: middleware);
   }
 
-  void patch(String path, RequestHandler handler) {
-    _router.addRoute(RequestTypes.PATCH, path, handler);
+  void patch(String path, RequestHandler handler,
+      {List<MiddlewareHandler>? middleware}) {
+    _addRoute(RequestTypes.PATCH, path, handler, middleware: middleware);
   }
 
-  void delete(String path, RequestHandler handler) {
-    _router.addRoute(RequestTypes.DELETE, path, handler);
+  void delete(String path, RequestHandler handler,
+      {List<MiddlewareHandler>? middleware}) {
+    _addRoute(RequestTypes.DELETE, path, handler, middleware: middleware);
   }
 
-  void options(String path, RequestHandler handler) {
-    _router.addRoute(RequestTypes.OPTIONS, path, handler);
+  void options(String path, RequestHandler handler,
+      {List<MiddlewareHandler>? middleware}) {
+    _addRoute(RequestTypes.OPTIONS, path, handler, middleware: middleware);
   }
 
-  // Add other HTTP methods as needed
+  void _addRoute(String method, String path, RequestHandler handler,
+      {List<MiddlewareHandler>? middleware}) {
+    final wrappedHandler = _wrapWithMiddleware(handler, middleware ?? []);
+    _router.addRoute(method, path, wrappedHandler);
+  }
+
+  RequestHandler _wrapWithMiddleware(
+      RequestHandler handler, List<MiddlewareHandler> routeMiddleware) {
+    return (Request request, Response response) async {
+      int globalIndex = 0;
+      int routeIndex = 0;
+
+      Future<void> runNextMiddleware() async {
+        if (globalIndex < _globalMiddleware.length) {
+          await _globalMiddleware[globalIndex++](
+              request, response, runNextMiddleware);
+        } else if (routeIndex < routeMiddleware.length) {
+          await routeMiddleware[routeIndex++](
+              request, response, runNextMiddleware);
+        } else {
+          await handler(request, response);
+        }
+      }
+
+      await runNextMiddleware();
+    };
+  }
 
   void inject<T>(T instance) {
     _container.registerSingleton<T>(instance);
-  }
-
-  Future<void> _applyMiddleware(Request request, Response response) async {
-    for (var middleware in _middleware) {
-      if (request.uri.path.startsWith(middleware.path)) {
-        bool next = false;
-        await middleware.handler(request, response, () => next = true);
-        if (!next) break;
-      }
-    }
   }
 
   Future<void> listen(int port) async {
@@ -79,7 +102,30 @@ class DartExpress {
     }
   }
 
-  MiddlewareFunction cors({
+  Future<void> _handleRequest(HttpRequest httpRequest) async {
+    final request = Request.from(httpRequest, container: _container);
+    final response = Response();
+
+    try {
+      final handler = _router.findHandler(request.method, request.uri.path);
+      if (handler != null) {
+        await handler(request, response);
+      } else {
+        response.setStatus(HttpStatus.notFound);
+        response.text('Not Found');
+      }
+    } catch (e, trace) {
+      print('Error handling request: $e, trace:$trace');
+      response.setStatus(HttpStatus.internalServerError);
+      response.text('Internal Server Error');
+    }
+
+    if (!response.isSent) {
+      response.send(httpRequest.response);
+    }
+  }
+
+  MiddlewareHandler cors({
     List<String> allowedOrigins = const ['*'],
     List<String> allowedMethods = RequestTypes.allTypes,
     List<String> allowedHeaders = const ['Content-Type', 'Authorization'],
@@ -109,32 +155,5 @@ class DartExpress {
       }
       await next();
     };
-  }
-
-  Future<void> _handleRequest(HttpRequest httpRequest) async {
-    final request = Request.from(httpRequest, container: _container);
-    final response = Response();
-
-    try {
-      await _applyMiddleware(request, response);
-
-      if (!response.isSent) {
-        final handler = _router.findHandler(request.method, request.uri.path);
-        if (handler != null) {
-          await handler(request, response);
-        } else {
-          response.setStatus(HttpStatus.notFound);
-          response.text('Not Found');
-        }
-      }
-    } catch (e, trace) {
-      print('Error handling request: $e, trace:$trace');
-      response.setStatus(HttpStatus.internalServerError);
-      response.text('Internal Server Error');
-    }
-
-    if (!response.isSent) {
-      response.send(httpRequest.response);
-    }
   }
 }
