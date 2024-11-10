@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:server/models/request.dart';
 import 'package:server/models/response.dart';
@@ -41,7 +42,7 @@ void main() {
     response.json({'success': true, 'data': formData});
   });
 
-  app.listen(3000);
+  app.listen(int.parse(Platform.environment['PORT'] ?? '8080'));
 }
 
 class DatabaseService {

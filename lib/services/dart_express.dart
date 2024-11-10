@@ -95,7 +95,7 @@ class DartExpress {
   }
 
   Future<void> listen(int port) async {
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
+    final server = await HttpServer.bind(InternetAddress.anyIPv4, port);
     print('Server listening on port ${server.port}');
 
     await for (HttpRequest httpRequest in server) {
