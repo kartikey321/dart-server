@@ -8,7 +8,7 @@ extension ListContains<T> on List<T> {
   }
 
   int? containsWithId(
-    bool test(T element),
+    bool Function(T element) test,
   ) {
     for (var element in this) {
       if (test(element)) return indexOf(element);
@@ -17,7 +17,7 @@ extension ListContains<T> on List<T> {
   }
 
   T? containsWithCondition(
-    bool test(T element),
+    bool Function(T element) test,
   ) {
     for (var element in this) {
       if (test(element)) return element;

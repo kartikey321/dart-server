@@ -134,9 +134,17 @@ class DartExpress {
   }) {
     return (request, response, next) async {
       final origin = request.headers.value('Origin');
-      if (origin != null &&
-          (allowedOrigins.contains('*') || allowedOrigins.contains(origin))) {
-        response.setHeader('Access-Control-Allow-Origin', origin);
+      final method = request.method;
+
+      // Check if the origin is allowed
+      bool isAllowedOrigin(String? origin) {
+        return origin != null &&
+            (allowedOrigins.contains('*') || allowedOrigins.contains(origin));
+      }
+
+      if (isAllowedOrigin(origin)) {
+        // Set CORS headers
+        response.setHeader('Access-Control-Allow-Origin', origin!);
         response.setHeader(
             'Access-Control-Allow-Methods', allowedMethods.join(', '));
         response.setHeader(
@@ -147,12 +155,36 @@ class DartExpress {
           response.setHeader('Access-Control-Allow-Credentials', 'true');
         }
 
-        if (request.method == 'OPTIONS') {
-          response.setStatus(204);
+        // Handle preflight OPTIONS request
+        if (method == 'OPTIONS') {
+          response.setStatus(HttpStatus.noContent); // 204 No Content
           response.send(request.httpRequest.response);
           return;
         }
+      } else if (origin != null && !isAllowedOrigin(origin)) {
+        // If origin is not allowed, log and respond with 403 Forbidden
+        print('CORS Denied - Origin not allowed: $origin');
+        response.setStatus(HttpStatus.forbidden); // 403 Forbidden
+        response.text('CORS policy does not allow this origin.');
+        response.send(request.httpRequest.response);
+        return;
+      } else if (!allowedMethods.contains(method)) {
+        // If method is not allowed, respond with 405 Method Not Allowed
+        print('CORS Denied - Method not allowed: $method');
+        response
+            .setStatus(HttpStatus.methodNotAllowed); // 405 Method Not Allowed
+        response.text('Method not allowed.');
+        response.send(request.httpRequest.response);
+        return;
       }
+
+      // Set additional security headers (recommended for production)
+      response.setHeader(
+          'Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+      response.setHeader('X-Content-Type-Options', 'nosniff');
+      response.setHeader('X-Frame-Options', 'DENY');
+
+      // Proceed to the next middleware/handler if CORS checks pass
       await next();
     };
   }

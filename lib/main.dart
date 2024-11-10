@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:server/models/request.dart';
 import 'package:server/models/response.dart';
 import 'package:server/services/controller.dart';
@@ -10,10 +12,13 @@ void main() {
   app.inject(DatabaseService());
 
   // Use CORS middleware
-  app.use(app.cors(
-      allowedOrigins: ['https://example.com'],
-      allowedMethods: ['GET', 'POST', 'PUT', 'DELETE'],
-      allowCredentials: true));
+  app.use(
+    app.cors(
+      allowedOrigins: ['*'],
+      allowedMethods: [...RequestTypes.allTypes],
+      allowCredentials: true,
+    ),
+  );
 
   // Add a route with path parameter
   app.get('/api/data', (request, response) async {
@@ -39,7 +44,37 @@ void main() {
   app.listen(3000);
 }
 
-class DatabaseService {}
+class DatabaseService {
+  final List<Map<String, dynamic>> _data = [];
+
+  void create(Map<String, dynamic> record) {
+    _data.add(record);
+    print('Record added: $record');
+  }
+
+  List<Map<String, dynamic>> readAll() {
+    print('Reading all records...');
+    return _data;
+  }
+
+  void update(int index, Map<String, dynamic> newRecord) {
+    if (index >= 0 && index < _data.length) {
+      _data[index] = newRecord;
+      print('Record at index $index updated to: $newRecord');
+    } else {
+      print('Record at index $index not found');
+    }
+  }
+
+  void delete(int index) {
+    if (index >= 0 && index < _data.length) {
+      print('Deleting record at index $index: ${_data[index]}');
+      _data.removeAt(index);
+    } else {
+      print('Record at index $index not found');
+    }
+  }
+}
 
 class UsersController extends Controller {
   @override
@@ -52,8 +87,48 @@ class UsersController extends Controller {
   @override
   void registerRoutes(options) {
     options.get('/', getUsers);
-    options.get('/:id', getUserById);
+    options.get('/post', addRecords);
+    options.get('/get-posts', getRecords);
+    // options.get('/:id', getUserById);
     options.post('/users', createUser);
+    options.get('/image', getImage);
+    options.get('/put-image', showImage);
+  }
+
+  void getRecords(Request request, Response response) async {
+    final dbService = request.container.get<DatabaseService>();
+
+    final records = dbService.readAll();
+    response.json({'records': records});
+  }
+
+  void addRecords(Request request, Response response) async {
+    final dbService = request.container.get<DatabaseService>();
+
+    final newRecord = {'id': 3, 'name': 'New User'};
+    dbService.create(newRecord);
+    response.json({'message': 'Record added', 'record': newRecord});
+  }
+
+  void showImage(Request request, Response response) async {
+    var files = await request.files;
+    if (files.isNotEmpty) {
+      var data = files.entries.first.value.first;
+      // Read the stream once and convert it to a List<int>
+      var bytes = await data.finalize().toList();
+      // Flatten the list of lists to a single list of bytes
+      var flattenedBytes = bytes.expand((e) => e).toList();
+      var base64Image = base64Encode(flattenedBytes);
+
+      response.html(
+        '<img src="data:${data.contentType};base64,$base64Image"/>',
+      );
+    }
+  }
+
+  void getImage(Request request, Response response) {
+    response.html(
+        '<img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRE54fv4jfGnS39pFjOCJo5qEE3qh86HIst3w&s"/>');
   }
 
   void getUsers(Request request, Response response) {

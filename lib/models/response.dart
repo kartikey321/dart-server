@@ -21,17 +21,17 @@ class Response {
 
   void json(Map<String, dynamic> data) {
     body = jsonEncode(data);
-    headers['Content-Type'] = ContentType.json.toString();
+    headers['Content-Type'] = ContentType.json.mimeType;
   }
 
   void text(String data) {
     body = data;
-    headers['Content-Type'] = ContentType.text.toString();
+    headers['Content-Type'] = ContentType.text.mimeType;
   }
 
   void html(String html) {
     body = html;
-    headers['Content-Type'] = ContentType.html.toString();
+    headers['Content-Type'] = ContentType.html.mimeType;
   }
 
   void xml(String xml) {
@@ -66,13 +66,13 @@ class Response {
     final extension = filePath.split('.').last.toLowerCase();
     switch (extension) {
       case 'html':
-        return ContentType.html.toString();
+        return ContentType.html.mimeType;
       case 'css':
         return 'text/css';
       case 'js':
         return 'application/javascript';
       case 'json':
-        return ContentType.json.toString();
+        return ContentType.json.mimeType;
       case 'png':
         return 'image/png';
       case 'jpg':

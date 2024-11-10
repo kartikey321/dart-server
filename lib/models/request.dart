@@ -58,9 +58,10 @@ class Request {
             final filename = RegExp(r'filename="([^"]*)"')
                 .firstMatch(contentDisposition)!
                 .group(1)!;
-            final content = await part.toList();
-            var length = await part.length;
-            final file = MultipartFile(name, part, length, filename: filename);
+            final contentBytes =
+                await consolidateBytes(part); // Use helper to fully read stream
+            final file =
+                MultipartFile.fromBytes(name, contentBytes, filename: filename);
             _files![name] = (_files![name] ?? [])..add(file);
           } else {
             final value = await utf8.decoder.bind(part).join();
@@ -95,6 +96,15 @@ class Request {
   Future<Map<String, List<MultipartFile>>> get files async {
     await formData; // Ensure formData has been processed
     return _files ?? {};
+  }
+
+  // Helper method to read stream fully into a list of bytes to prevent multiple listens
+  static Future<List<int>> consolidateBytes(Stream<List<int>> stream) async {
+    final buffer = BytesBuilder();
+    await for (final chunk in stream) {
+      buffer.add(chunk);
+    }
+    return buffer.takeBytes();
   }
 }
 
