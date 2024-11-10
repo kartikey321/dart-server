@@ -1,11 +1,12 @@
 import 'dart:io';
 
+import 'package:server/services/dependency_injection.dart';
 import 'package:server/services/router.dart';
 
 import '../models/request.dart';
 import '../models/response.dart';
 import 'controller.dart';
-import 'middleware..dart';
+import '../models/middleware.dart';
 
 class RequestTypes {
   static const String GET = 'GET';

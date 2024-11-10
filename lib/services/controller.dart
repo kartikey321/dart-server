@@ -1,7 +1,7 @@
 import 'package:meta/meta.dart';
 
 import 'dart_express.dart';
-import 'middleware..dart';
+import '../models/middleware.dart';
 
 class ControllerOptions {
   late final DartExpress _app;

@@ -4,8 +4,8 @@ import 'dart:math';
 
 import 'package:http/http.dart';
 import 'package:mime/mime.dart';
+import 'package:server/services/dependency_injection.dart';
 
-import '../services/middleware..dart';
 
 class Request {
   final HttpRequest httpRequest;
