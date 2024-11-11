@@ -21,6 +21,14 @@ void main() {
     ),
   );
 
+  //rate-limiter
+  app.use(
+    app.rateLimiter(
+      maxRequests: 2,
+      window: Duration(minutes: 5),
+    ),
+  );
+
   // Add a route with path parameter
   app.get('/api/data', (request, response) async {
     final data = await request.body;
@@ -42,7 +50,8 @@ void main() {
     response.json({'success': true, 'data': formData});
   });
 
-  app.listen(int.parse(Platform.environment['PORT'] ?? '8080'));
+  // app.listen(int.parse(Platform.environment['PORT'] ?? '8080'));
+  app.listen(3000);
 }
 
 class DatabaseService {

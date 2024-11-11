@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:server/models/memory_store.dart';
 import 'package:server/services/dependency_injection.dart';
 import 'package:server/services/router.dart';
 
@@ -186,6 +187,32 @@ class DartExpress {
       response.setHeader('X-Frame-Options', 'DENY');
 
       // Proceed to the next middleware/handler if CORS checks pass
+      await next();
+    };
+  }
+
+  //rate limiter middleware
+  MiddlewareHandler rateLimiter({
+    int maxRequests = 100,
+    Duration window = const Duration(minutes: 1),
+    String Function(Request request)? keyGenerator,
+    RateLimitStore? store,
+  }) {
+    final effectiveStore = store ?? MemoryRateLimitStore();
+    return (request, response, next) async {
+      final key = keyGenerator != null
+          ? keyGenerator(request)
+          : request.httpRequest.connectionInfo?.remoteAddress.address ??
+              'unkown'; //needs to be fixed or discussed : TODO
+      final isAllowed =
+          await effectiveStore.increment(key, maxRequests, window);
+
+      if (!isAllowed) {
+        response.setStatus(HttpStatus.tooManyRequests);
+        response.text('Rate limit exceeded. Try again later.');
+        return;
+      }
+
       await next();
     };
   }

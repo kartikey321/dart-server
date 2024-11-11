@@ -6,7 +6,6 @@ import 'package:http/http.dart';
 import 'package:mime/mime.dart';
 import 'package:server/services/dependency_injection.dart';
 
-
 class Request {
   final HttpRequest httpRequest;
   Map<String, String> params = {};
