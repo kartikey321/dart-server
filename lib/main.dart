@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:server/models/request.dart';
 import 'package:server/models/response.dart';
+import 'package:server/models/static_file_middleware.dart';
 import 'package:server/services/controller.dart';
 import 'package:server/services/dart_express.dart';
 
@@ -11,6 +12,9 @@ void main() {
 
   // Register a dependency
   app.inject(DatabaseService());
+
+  // Serve static files from the "public" directory
+  app.use(staticFileMiddleware('public'));
 
   // Use CORS middleware
   app.use(
@@ -24,10 +28,27 @@ void main() {
   //rate-limiter
   app.use(
     app.rateLimiter(
-      maxRequests: 2,
+      maxRequests: 200,
       window: Duration(minutes: 5),
     ),
   );
+
+  // Optional: Add a route to list available files (for debugging)
+  app.get('/files', (request, response) async {
+    final publicDir = Directory('public');
+    final files = publicDir
+        .listSync(recursive: true)
+        .whereType<File>()
+        .map((file) => {
+              'path': file.path.replaceFirst('${publicDir.path}/', ''),
+              'absolutePath': file.path,
+              'size': file.lengthSync(),
+              'modified': file.lastModifiedSync().toIso8601String(),
+            })
+        .toList();
+    print('Files in public directory: $files');
+    response.json({'files': files});
+  });
 
   // Add a route with path parameter
   app.get('/api/data', (request, response) async {
