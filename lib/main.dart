@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -88,7 +89,9 @@ void main() {
   });
 
   // app.listen(int.parse(Platform.environment['PORT'] ?? '8080'));
-  app.listen(3000);
+
+  int port = int.parse(Platform.environment['PORT'] ?? '8080');
+  app.listen(port);
 }
 
 class DatabaseService {
