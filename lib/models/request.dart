@@ -69,7 +69,7 @@ class Request {
         }
       }
     }
-    return _formData ?? {};
+    return (_files != null && _files!.isNotEmpty) ? _files! : (_formData ?? {});
   }
 
   factory Request.from(

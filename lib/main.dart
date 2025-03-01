@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:http/http.dart' as http;
 import 'package:server/models/request.dart';
 import 'package:server/models/response.dart';
 import 'package:server/models/static_file_middleware.dart';
@@ -29,6 +31,7 @@ void main() {
   app.use(
     app.rateLimiter(
       maxRequests: 200,
+      // maxRequests: 100,
       window: Duration(minutes: 5),
     ),
   );
@@ -65,14 +68,52 @@ void main() {
   app.useController('/users', UsersController());
   app.useController('/posts', PostsController());
   // Handle form data
+
+  Future<String> handleMultipartFile(http.MultipartFile multipartFile) async {
+    // Convert MultipartFile to Uint8List
+    Uint8List fileBytes = await multipartFile
+        .finalize()
+        .fold<BytesBuilder>(
+            BytesBuilder(), (builder, bytes) => builder..add(bytes))
+        .then((b) => b.takeBytes());
+
+    // Convert Uint8List to base64
+    String base64String = base64Encode(fileBytes);
+
+    // Generate the HTML string
+    String htmlString = '''
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>Image Preview</title>
+  </head>
+  <body>
+    <h1>Image Preview</h1>
+    <img src="data:image/png;base64,$base64String" alt="Uploaded Image" />
+  </body>
+  </html>
+  ''';
+
+    // Use the generated HTML as a response
+    return htmlString; // Or pass it as needed to your response
+  }
+
   app.post('/api/form', (request, response) async {
     final formData = await request.formData;
     // Process the form data
-    response.json({'success': true, 'data': formData});
+    if (formData.values.first is List<http.MultipartFile>) {
+      var file = formData.values.first.first as http.MultipartFile;
+
+      response.html(await handleMultipartFile(file));
+    } else {
+      response.json({'success': true, 'data': formData});
+    }
   });
 
   // app.listen(int.parse(Platform.environment['PORT'] ?? '8080'));
-  app.listen(3000);
+
+  int port = int.parse(Platform.environment['PORT'] ?? '8080');
+  app.listen(port);
 }
 
 class DatabaseService {
